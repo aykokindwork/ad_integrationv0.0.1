@@ -1,0 +1,21 @@
+@startuml
+actor User
+participant Application
+participant AD
+participant BD
+scale 1.0
+
+User -> Application: запрос на вход(дал логин пароль)
+group Аутентификация
+Application -> AD: проверка учётных данных пользователя
+AD --> Application: успешная проверка
+end
+group Авторизация
+Application -> AD: запрос групп и атрибутов пользователя
+AD --> Application: группы и атрибуты пользователя
+Application -> BD: запрос на получения ролей
+BD --> Application: отправка ролей
+Application -> Application: RBAC логика: в зависимости от группы присваивается роль пользователю
+end
+Application --> User: вход успешен 
+@enduml

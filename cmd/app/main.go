@@ -41,8 +41,8 @@ func main() {
 	}
 	fmt.Println(login, password)*/
 
-	login = "secret"
-	password = "secrett"
+	login = os.Getenv("LOGIN")
+	password = os.Getenv("PASS")
 	fmt.Println(login, password)
 
 	err = ldapConnection.AuthUser(login, password)

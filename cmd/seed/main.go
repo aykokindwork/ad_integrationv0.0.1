@@ -1,7 +1,7 @@
 package main
 
 import (
-	"ad_integration/internal/db"
+	"ad_integration/internal/repository"
 	"context"
 	"fmt"
 	"os"
@@ -122,7 +122,7 @@ func main() {
 	defer cancelCTX()
 
 	addressDB := os.Getenv("CONN_STRING")
-	conn, err := db.Connection(ctx, addressDB)
+	conn, err := repository.Connection(ctx, addressDB)
 	if err != nil {
 		fmt.Println("Fail to connect to DB: ", err)
 		return
@@ -136,11 +136,11 @@ func main() {
 	}
 	defer tx.Rollback(ctx)
 
-	permName := "test_item"
-	permCode := "io.test"
-	roleCode := "IT-test"
-	roleName := "Тестировщик"
-	group := "lab-test-admins"
+	permName := "Разрабатывать"
+	permCode := "io.develope"
+	roleCode := "developer"
+	roleName := "Разработчик"
+	group := "Developer"
 
 	if err := fullcreate(ctx, tx, permCode, permName, roleCode, roleName, group); err != nil {
 		fmt.Println("Fail:", err)

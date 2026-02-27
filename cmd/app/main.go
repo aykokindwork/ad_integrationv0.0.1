@@ -1,8 +1,8 @@
 package main
 
 import (
-	auth "ad_integration/internal/auth"
-	"ad_integration/internal/db"
+	"ad_integration/internal/repository"
+	auth "ad_integration/internal/service"
 	"context"
 	"fmt"
 	"os"
@@ -42,7 +42,7 @@ func main() {
 	fmt.Println(login, password)*/
 
 	login = os.Getenv("LOGIN")
-	password = os.Getenv("PASS")
+	password = os.Getenv("PASSW")
 	fmt.Println(login, password)
 
 	err = ldapConnection.AuthUser(login, password)
@@ -73,7 +73,7 @@ func main() {
 	ctx := context.Background()
 	addressDB := os.Getenv("CONN_STRING")
 
-	conn, err := db.Connection(ctx, addressDB)
+	conn, err := repository.Connection(ctx, addressDB)
 	if err != nil {
 		panic(err)
 	}
@@ -81,18 +81,18 @@ func main() {
 
 	fmt.Println("connection is succeded")
 
-	userID, err := db.SyncUser(ctx, conn, userDetails)
+	userID, err := repository.SyncUser(ctx, conn, userDetails)
 	if err != nil {
 		fmt.Println("Ошибка при сихронизации user:", err)
 		return
 	}
 
-	if err := db.SyncGroups(ctx, conn, userDetails.Groups); err != nil {
+	if err := repository.SyncGroups(ctx, conn, userDetails.Groups); err != nil {
 		fmt.Println("Ошибка при синхронизации групп:", err)
 		return
 	}
 
-	if err := db.RefreshUserRoles(ctx, conn, userID, userDetails.Groups); err != nil {
+	if err := repository.RefreshUserRoles(ctx, conn, userID, userDetails.Groups); err != nil {
 		fmt.Println("Ошибка при обновление ролей пользователя:", err)
 		return
 	}

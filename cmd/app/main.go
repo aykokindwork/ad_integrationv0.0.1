@@ -1,8 +1,8 @@
 package main
 
 import (
-	"ad_integration/internal/repository"
-	auth "ad_integration/internal/service"
+	"ad_integration/internal/service"
+	ldap "ad_integration/internal/service/ldap"
 	"context"
 	"fmt"
 	"os"
@@ -13,64 +13,69 @@ import (
 var login string
 var password string
 
+type MockClient struct {
+}
+
+func (m MockClient) Search(
+	ctx context.Context,
+	login string,
+	filter string,
+	attributes []string,
+) (*ldap.RawUser, error) {
+	mockRawUser := &ldap.RawUser{
+		DN: "dsadasda",
+		Attributes: map[string][]string{
+			"cn":             {"a.khafizov"},
+			"sAMAccountName": {"a.khafizov"},
+			"memberOf": {"CN=Admins,DC=tp,DC=local",
+				"CN=Users,DC=tp,DC=local"}},
+	}
+
+	return mockRawUser, nil
+}
+
+func (m MockClient) BindUser(
+	login string,
+	password string,
+) error {
+	return nil
+}
+
 func main() {
 	url := os.Getenv("URL")
-	BaseDN := os.Getenv("BASEDN")
-	Attributes := []string{
+	baseDN := os.Getenv("BASEDN")
+	attributes := []string{
 		"cn",
 		"memberOf",       // Тут будет лежать твоя lab-test-admins
 		"sAMAccountName", // Тут будет лежать lab-admin
 	}
-	UseTLS := true
+	useTLS := true
+	serverName := "DC01.tp.local"
 
-	cfg := auth.LoadConfig(url, BaseDN, UseTLS, Attributes)
+	cfg := ldap.LoadConfig(url, baseDN, useTLS, attributes, serverName)
 
-	ldapConnection, err := auth.NewLDAPConnection(cfg)
+	/*client, err := ldap.NewLDAPConnection(cfg)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
-	}
+	}*/
 
-	/*fmt.Println("Введите логин, пароль")
-	if _, err := fmt.Scanln(&login); err != nil {
-		panic(err)
-	}
+	mockClient := MockClient{}
 
-	if _, err := fmt.Scanln(&password); err != nil {
-		panic(err)
-	}
-	fmt.Println(login, password)*/
+	s := service.NewAuthService(mockClient)
 
 	login = os.Getenv("LOGIN")
 	password = os.Getenv("PASSW")
 	fmt.Println(login, password)
 
-	err = ldapConnection.AuthUser(login, password)
-	if err != nil {
-		fmt.Println("Доступ запрещен:", err)
-		return
-	}
-	fmt.Println("Succesfull bind")
-
-	/*testGroupsFromAD := []string{
-		"CN=lab-test-admins,OU=Groups,DC=tp,DC=local",
-		"CN=all-staff,OU=Global,DC=tp,DC=local",
-		"CN=vpn-users,OU=Access,DC=tp,DC=local",
-	}
-	*/
-
-	userDetails, err := ldapConnection.FetchUserDetails(login)
+	rawUser, err := s.Authenticate(context.Background(), login, password, cfg.Attributes)
 	if err != nil {
 		fmt.Println("Fail to Fetch User's Details:", err)
 		return
 	}
-	pp.Println(userDetails)
+	pp.Println(rawUser)
 
-	fmt.Println("username:", userDetails.Username)
-	fmt.Println("user_email:", userDetails.Email)
-	fmt.Println("user_group:", userDetails.Groups)
-
-	ctx := context.Background()
+	/*ctx := context.Background()
 	addressDB := os.Getenv("CONN_STRING")
 
 	conn, err := repository.Connection(ctx, addressDB)
@@ -95,5 +100,12 @@ func main() {
 	if err := repository.RefreshUserRoles(ctx, conn, userID, userDetails.Groups); err != nil {
 		fmt.Println("Ошибка при обновление ролей пользователя:", err)
 		return
-	}
+	}*/
 }
+
+/*testGroupsFromAD := []string{
+	"CN=lab-test-admins,OU=Groups,DC=tp,DC=local",
+	"CN=all-staff,OU=Global,DC=tp,DC=local",
+	"CN=vpn-users,OU=Access,DC=tp,DC=local",
+}
+*/

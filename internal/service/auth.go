@@ -1,12 +1,14 @@
 package service
 
 import (
-	"errors"
+	ldap "ad_integration/internal/service/ldap"
+	"context"
 	"fmt"
+	"regexp"
 	"strings"
-
-	ldap "github.com/go-ldap/ldap/v3"
 )
+
+var loginRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,20}$`)
 
 type LDAPUser struct {
 	Username string
@@ -14,67 +16,59 @@ type LDAPUser struct {
 	Groups   []string // Сюда положим названия групп из memberOf
 }
 
-// authorization
-// ldap.bind
-func (a *LDAPAuth) AuthUser(login string, password string) error {
-	//authentification
-	err := a.Conn.Bind("tp\\"+login, password)
-	if err != nil {
-		ldapErr := parseLDAPError(err)
-		return ldapErr
-	}
-	return nil
+type IdentityProvider interface {
+	Search(ctx context.Context, login string, filter string, attributes []string) (*ldap.RawUser, error)
+	BindUser(login string, password string) error
+}
+type AuthService struct {
+	provider IdentityProvider // Нам плевать, LDAP это или база
 }
 
-// Достает атрибуты, которые нам нужны
-func (a *LDAPAuth) FetchUserDetails(login string) (*LDAPUser, error) {
-	// 1. Создаем поисковый запрос
-
-	cleanLogin := login
-	if strings.Contains(login, "\\") {
-		parts := strings.Split(login, "\\")
-		cleanLogin = parts[len(parts)-1] // Берем последнюю часть (самого юзера)
+func NewAuthService(provider IdentityProvider) *AuthService {
+	return &AuthService{
+		provider: provider,
 	}
-
-	escapedLogin := ldap.EscapeFilter(cleanLogin)
-
-	searchRequest := ldap.NewSearchRequest(
-		a.config.BaseDN,        // "dc=tp,dc=local" — где ищем
-		ldap.ScopeWholeSubtree, // Ищем во всех вложенных папках (OU)
-		ldap.NeverDerefAliases,
-		0, 0, false,
-		fmt.Sprintf("(sAMAccountName=%s)", escapedLogin),            // Наш фильтр
-		[]string{"sAMAccountName", "userPrincipalName", "memberOf"}, // Атрибуты, которые хотим забрать
-		nil,
-	)
-
-	// 2. Выполняем поиск через сохраненное соединение a.conn
-	sr, err := a.Conn.Search(searchRequest)
-	if err != nil {
-		return nil, fmt.Errorf("ldap search fatal: %w", err)
-	}
-
-	// 3. Проверяем результат
-	if len(sr.Entries) == 0 {
-		return nil, fmt.Errorf("user not found in AD")
-	}
-
-	// Берем первую найденную запись (т.к. логин уникален)
-	entry := sr.Entries[0]
-
-	// 4. Мапим данные в нашу структуру из User.go
-	userDetails := &LDAPUser{
-		Username: entry.GetAttributeValue("sAMAccountName"),
-		Email:    entry.GetAttributeValue("userPrincipalName"),
-		Groups:   entry.GetAttributeValues("memberOf"), // Возвращает []string
-	}
-
-	userDetails.cleanAttributes()
-
-	return userDetails, nil
 }
 
-// CleanAttributes приводит все данные пользователя в порядок
+func (s *AuthService) Authenticate(ctx context.Context, login string, passwd string, attrs []string) (*LDAPUser, error) {
+
+	filter := fmt.Sprintf("(sAMAccountName=%s)", login)
+
+	if err := s.provider.BindUser(login, passwd); err != nil {
+		return nil, fmt.Errorf("authentication failed: %w", err)
+	}
+
+	raw, err := s.provider.Search(ctx, login, filter, attrs)
+	if err != nil {
+		return nil, fmt.Errorf("user search failed: %w", err)
+	}
+
+	if len(raw.DN) == 0 {
+		return nil, fmt.Errorf("no saved raw.DN")
+	}
+	if len(raw.Attributes) == 0 {
+		return nil, fmt.Errorf("no saved raw.Attributes")
+	}
+
+	if len(raw.Attributes["userPrincipalName"]) == 0 {
+		fmt.Println("no email")
+	}
+
+	user := &LDAPUser{
+		Username: raw.Attributes["sAMAccountName"][0],
+		Email:    raw.Attributes["userPrincipalName"][0],
+		Groups:   raw.Attributes["memberOf"],
+	}
+
+	user.cleanAttributes()
+
+	return user, nil
+}
+
+func isLoginValid(login string) bool {
+	return loginRegex.MatchString(login)
+}
+
 func (u *LDAPUser) cleanAttributes() {
 	// 1. Чистим Логин (делаем маленькими буквами для единообразия в БД)
 	u.Username = strings.ToLower(u.Username)
@@ -93,28 +87,4 @@ func (u *LDAPUser) cleanAttributes() {
 		}
 	}
 	u.Groups = cleanGroups
-}
-
-func parseLDAPError(err error) error {
-	ldapErr, ok := err.(*ldap.Error)
-	if !ok {
-		return err
-	}
-
-	if ldapErr.ResultCode == ldap.LDAPResultInvalidCredentials {
-		errText := ldapErr.Error()
-
-		switch {
-		case strings.Contains(errText, "data 52e"):
-			return errors.New("неверный логин или пароль")
-
-		case strings.Contains(errText, "data 775"):
-			return errors.New("аккаунт заблокирован")
-
-		default:
-			return errors.New("ошибка аутентификации")
-		}
-	}
-
-	return err
 }

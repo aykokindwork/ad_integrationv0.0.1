@@ -1,0 +1,69 @@
+@startuml
+left to right direction
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam class {
+    BackgroundColor White
+    ArrowColor #2688d4
+    BorderColor #2688d4
+}
+
+entity "users" as users {
+  * id : SERIAL <<PK>>
+  --
+  login : varchar(50) <<UNIQUE>>
+  email : varchar(150)
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "roles" as roles {
+  * id : SERIAL <<PK>>
+  --
+  code : varchar(50) <<UNIQUE>>
+  name : varchar(100)
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "permissions" as perms {
+  * id : SERIAL <<PK>>
+  --
+  code : varchar(50) <<UNIQUE>>
+  name : varchar(100)
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "users_roles" as ur {
+  * user_id : integer <<PK,FK>>
+  * role_id : integer <<PK,FK>>
+  --
+  assigned_at : timestamp
+}
+
+entity "permissions_roles" as pr {
+  * role_id : integer <<PK,FK>>
+  * permission_id : integer <<PK,FK>>
+}
+
+entity "ldap_group_roles" as lgr {
+  * id : SERIAL <<PK>>
+  --
+  ad_group_name : varchar(255)
+  role_id : integer <<FK>>
+  --
+  UNIQUE (ad_group_name, role_id)
+}
+
+' Relationships
+users ||--o{ ur
+roles ||--o{ ur
+
+roles ||--o{ pr
+perms ||--o{ pr
+
+roles ||--o{ lgr
+
+@enduml

@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS auth.users CASCADE;
+DROP TABLE IF EXISTS auth.roles CASCADE;
+DROP TABLE IF EXISTS auth.permissions CASCADE;
+DROP TABLE IF EXISTS auth.users_roles CASCADE;
+DROP TABLE IF EXISTS auth.ldap_group_roles CASCADE;
+DROP TABLE IF EXISTS auth.roles_permissions CASCADE;

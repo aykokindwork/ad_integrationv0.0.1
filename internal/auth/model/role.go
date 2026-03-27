@@ -1,0 +1,14 @@
+package model
+
+import "time"
+
+type Role struct {
+	ID   int    `db:"id"`
+	Code string `db:"code"`
+	Name string `db:"name"`
+
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+
+	Permissions []Permission `db:"permissions"`
+}

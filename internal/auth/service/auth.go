@@ -20,9 +20,6 @@ const (
 	attrMemberOf          = "memberOf"
 
 	userSearchFilterTmpl = "(" + attrSAMAccountName + "=%s)"
-
-	substrADInvalidCreds = "data 52e"
-	substrADUserBlocked  = "data 775"
 )
 
 var adUserAttributes = []string{
@@ -39,21 +36,6 @@ type LDAPUser struct {
 	Groups   []string // Сюда положим названия групп из memberOf
 }
 
-type UserData interface {
-	GetDN() string
-	GetAttr() map[string][]string
-}
-
-type IdentityProvider interface {
-	Search(ctx context.Context, login string, filter string, attributes []string) (*RawUser, error)
-	BindUser(login string, password string) error
-}
-
-type UserRepository interface {
-	SyncUser(ctx context.Context, user *LDAPUser) (int, error)
-	SyncGroups(ctx context.Context, groups []string) error
-	RefreshUserRoles(ctx context.Context, userID int, groups []string) error
-}
 type AuthService struct {
 	Provider       IdentityProvider
 	UserRepository UserRepository
@@ -70,14 +52,14 @@ func (s *AuthService) Authenticate(
 	ctx context.Context,
 	login string,
 	passwd string,
-	attrs []string) (*LDAPUser, error) {
+) (*LDAPUser, error) {
 
 	if err := s.Provider.BindUser(login, passwd); err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login))
-	raw, err := s.Provider.Search(ctx, login, filter, adUserAttributes)
+	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login)) //go change ldap, in layer http this can be checked
+	raw, err := s.Provider.Search(ctx, filter, adUserAttributes)
 	if err != nil {
 		return nil, fmt.Errorf("user search failed: %w", err)
 	}

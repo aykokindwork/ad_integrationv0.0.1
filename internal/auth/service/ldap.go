@@ -1,8 +1,7 @@
-package ldap
+package service
 
 import (
 	"ad_integration/config"
-	"ad_integration/internal/auth/service"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -10,6 +9,11 @@ import (
 	"strings"
 
 	ldap "github.com/go-ldap/ldap/v3"
+)
+
+const (
+	substrADInvalidCreds = "data 52e"
+	substrADUserBlocked  = "data 775"
 )
 
 type Client struct {
@@ -48,7 +52,6 @@ func NewLDAPConnection(cfg config.LDAPConfig) (*Client, error) {
 }
 
 func (c *Client) BindUser(login string, password string) error {
-	//authentification
 	err := c.Conn.Bind("tp\\"+login, password)
 	if err != nil {
 		var ldapErr *ldap.Error
@@ -61,10 +64,10 @@ func (c *Client) BindUser(login string, password string) error {
 			errText := ldapErr.Error()
 
 			switch {
-			case strings.Contains(errText, "data 52e"):
+			case strings.Contains(errText, substrADInvalidCreds):
 				return errors.New("неверный логин или пароль")
 
-			case strings.Contains(errText, "data 775"):
+			case strings.Contains(errText, substrADUserBlocked):
 				return errors.New("аккаунт заблокирован")
 
 			default:
@@ -75,14 +78,14 @@ func (c *Client) BindUser(login string, password string) error {
 	return nil
 }
 
-func (c *Client) Search(ctx context.Context, login string, filter string, attributes []string) (*service.RawUser, error) {
+func (c *Client) Search(ctx context.Context, filter string, attributes []string) (*RawUser, error) {
 
 	searchRequest := ldap.NewSearchRequest(
 		c.config.BaseDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
 		0, 0, false,
-		filter, //передавать только готовый фильтр
+		filter,
 		attributes,
 		nil,
 	)
@@ -98,7 +101,7 @@ func (c *Client) Search(ctx context.Context, login string, filter string, attrib
 
 	entry := searchResult.Entries[0]
 
-	rawUser := &service.RawUser{
+	rawUser := &RawUser{
 		DN:         entry.DN,
 		Attributes: make(map[string][]string),
 	}

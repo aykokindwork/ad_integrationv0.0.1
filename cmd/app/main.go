@@ -2,9 +2,8 @@ package main
 
 import (
 	"ad_integration/config"
-	repository "ad_integration/internal/auth/repository"
+	"ad_integration/internal/auth/repository/postgres"
 	"ad_integration/internal/auth/service"
-	"ad_integration/internal/auth/service/ldap"
 	"context"
 	"fmt"
 
@@ -19,27 +18,27 @@ func main() {
 	if err != nil {
 		fmt.Println("fail to load config")
 	}
-	
+
 	ctx := context.Background()
-	Db, err := repository.NewConnection(ctx, cfg.DB)
+	Db, err := postgres.NewConnection(ctx, cfg.DB)
 	if err != nil {
 		panic(err)
 	}
 	defer Db.Conn.Close(ctx)
 
-	client, err := ldap.NewLDAPConnection(cfg.LDAP)
+	userRepo := postgres.NewUserRepo(Db)
+
+	client, err := service.NewLDAPConnection(cfg.LDAP)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
+	defer client.Conn.Close()
 
-	fmt.Println("connection is succeded")
-
-	s := service.NewAuthService(client, Db)
-
+	s := service.NewAuthService(client, userRepo)
 	fmt.Println(login, password)
 
-	LdapUser, err := s.Authenticate(context.Background(), login, password, cfg.LDAP.Attributes)
+	LdapUser, err := s.Authenticate(ctx, login, password)
 	if err != nil {
 		fmt.Println("Fail to Fetch User's Details:", err)
 		return

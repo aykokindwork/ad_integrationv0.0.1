@@ -1,4 +1,4 @@
-package repository
+package postgres
 
 import (
 	"ad_integration/config"
@@ -16,8 +16,7 @@ type DbConn struct {
 func NewConnection(ctx context.Context, cfg config.DBConfig) (*DbConn, error) {
 	conn, err := pgx.Connect(ctx, cfg.Address)
 	if err != nil {
-		fmt.Errorf("fail to connect DB: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("fail to connect DB: %w", err)
 	}
 
 	return &DbConn{

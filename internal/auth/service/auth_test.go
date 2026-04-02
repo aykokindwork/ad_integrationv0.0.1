@@ -139,6 +139,7 @@ func TestAuthenticate(t *testing.T) {
 
 			provider := servicemocks.NewMockIdentityProvider(ctrl)
 			userRepository := repositorymocks.NewMockUserRepository(ctrl)
+			txManager := repositorymocks.NewMockTransactionManager(ctrl)
 
 			if tt.Authenticate.bindExpect {
 				provider.EXPECT().BindUser(
@@ -155,7 +156,7 @@ func TestAuthenticate(t *testing.T) {
 				).Return(tt.Authenticate.searchRes, tt.Authenticate.searchErr)
 			}
 
-			AuthService := NewAuthService(provider, userRepository)
+			AuthService := NewAuthService(provider, userRepository, txManager)
 
 			ldapUser, err := AuthService.Authenticate(context.Background(), "some", "some")
 

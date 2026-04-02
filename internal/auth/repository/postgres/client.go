@@ -2,25 +2,25 @@ package postgres
 
 import (
 	"ad_integration/config"
+	"ad_integration/core/apperr"
 	"context"
-	"fmt"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DbConn struct {
-	Conn   *pgx.Conn
+	Pool   *pgxpool.Pool
 	config config.DBConfig
 }
 
 func NewConnection(ctx context.Context, cfg config.DBConfig) (*DbConn, error) {
-	conn, err := pgx.Connect(ctx, cfg.Address)
+	pool, err := pgxpool.New(ctx, cfg.Address)
 	if err != nil {
-		return nil, fmt.Errorf("fail to connect DB: %w", err)
+		return nil, apperr.ErrDBUnexpected.WithErr(err)
 	}
 
 	return &DbConn{
-		Conn:   conn,
+		Pool:   pool,
 		config: cfg,
 	}, nil
 

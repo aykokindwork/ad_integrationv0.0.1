@@ -2,10 +2,11 @@ package service
 
 import (
 	"ad_integration/config"
+	errors2 "ad_integration/core/errors"
+	"ad_integration/internal/auth/model"
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"strings"
 
 	ldap "github.com/go-ldap/ldap/v3"
@@ -25,7 +26,7 @@ type Client struct {
 func NewLDAPConnection(cfg config.LDAPConfig) (*Client, error) {
 	conn, err := ldap.DialURL(cfg.URL)
 	if err != nil {
-		return nil, fmt.Errorf("LDAP connection error: %w", err)
+		return nil, errors2.ErrLdapUnexpected.WithErr(err)
 	}
 
 	// TLS шифрование
@@ -35,15 +36,9 @@ func NewLDAPConnection(cfg config.LDAPConfig) (*Client, error) {
 			ServerName:         cfg.ServerName,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("TLS connection failed: %w", err)
-		}
-		_, ok := conn.TLSConnectionState()
-		if !ok {
-			return nil, fmt.Errorf("TLS connection failed after succesful start: %w", err)
+			return nil, errors2.ErrLdapTLS.WithErr(err)
 		}
 	}
-
-	fmt.Println("everything is good, you have LDAP connection")
 
 	return &Client{
 		Conn:   conn,
@@ -65,20 +60,20 @@ func (c *Client) BindUser(login string, password string) error {
 
 			switch {
 			case strings.Contains(errText, substrADInvalidCreds):
-				return errors.New("неверный логин или пароль")
+				return errors2.ErrInvalidCredentials
 
 			case strings.Contains(errText, substrADUserBlocked):
-				return errors.New("аккаунт заблокирован")
+				return errors2.ErrUserIsBlocked
 
 			default:
-				return errors.New("ошибка аутентификации")
+				return errors2.ErrLdapUnexpected
 			}
 		}
 	}
 	return nil
 }
 
-func (c *Client) Search(ctx context.Context, filter string, attributes []string) (*RawUser, error) {
+func (c *Client) Search(ctx context.Context, filter string, attributes []string) (*model.RawUser, error) {
 
 	searchRequest := ldap.NewSearchRequest(
 		c.config.BaseDN,
@@ -92,18 +87,25 @@ func (c *Client) Search(ctx context.Context, filter string, attributes []string)
 
 	searchResult, err := c.Conn.Search(searchRequest)
 	if err != nil {
-		return nil, fmt.Errorf("fail to search: %w", err)
+		return nil, err
 	}
 
 	if len(searchResult.Entries) == 0 {
-		return nil, fmt.Errorf("fail to find user in AD")
+		return nil, errors2.ErrAdUserNotFound
 	}
 
 	entry := searchResult.Entries[0]
-
-	rawUser := &RawUser{
+	rawUser := &model.RawUser{
 		DN:         entry.DN,
 		Attributes: make(map[string][]string),
+	}
+
+	if len(rawUser.DN) == 0 {
+		return nil, errors2.ErrLdapNoDN
+	}
+
+	if len(rawUser.Attributes) == 0 {
+		return nil, errors2.ErrLdapNoAttributes
 	}
 
 	for _, attr := range attributes {

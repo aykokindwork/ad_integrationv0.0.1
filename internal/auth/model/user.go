@@ -3,12 +3,12 @@ package model
 import "time"
 
 type User struct {
-	ID    int    `db:"id"`
-	Login string `db:"login"`
-	Email string `db:"email"`
+	ID    int    `db:"id" json:"id"`
+	Login string `db:"login" json:"login"`
+	Email string `db:"email" json:"email"`
 
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 
-	RoleList []Role `db:"roles"`
+	Roles []Role `db:"roles" json:"roles"`
 }

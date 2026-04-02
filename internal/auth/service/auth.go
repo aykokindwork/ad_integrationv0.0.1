@@ -1,6 +1,8 @@
 package service
 
 import (
+	"ad_integration/core/errors"
+	"ad_integration/internal/auth/model"
 	"context"
 	"fmt"
 	"regexp"
@@ -8,11 +10,6 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 )
-
-type RawUser struct {
-	DN         string
-	Attributes map[string][]string
-}
 
 const (
 	attrSAMAccountName    = "sAMAccountName"
@@ -30,12 +27,6 @@ var adUserAttributes = []string{
 
 var loginRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,20}$`)
 
-type LDAPUser struct {
-	Username string
-	Email    string
-	Groups   []string // Сюда положим названия групп из memberOf
-}
-
 type AuthService struct {
 	Provider       IdentityProvider
 	UserRepository UserRepository
@@ -52,31 +43,26 @@ func (s *AuthService) Authenticate(
 	ctx context.Context,
 	login string,
 	passwd string,
-) (*LDAPUser, error) {
+) (*model.LDAPUser, error) {
 
 	if err := s.Provider.BindUser(login, passwd); err != nil {
-		return nil, fmt.Errorf("authentication failed: %w", err)
+		return nil, errors.ErrLdapBind.WithErr(err)
 	}
 
 	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login)) //go change ldap, in layer http this can be checked
 	raw, err := s.Provider.Search(ctx, filter, adUserAttributes)
 	if err != nil {
-		return nil, fmt.Errorf("user search failed: %w", err)
+		return nil, errors.ErrLdapSearch.WithErr(err)
 	}
 
-	if len(raw.DN) == 0 {
-		return nil, fmt.Errorf("no saved raw.DN")
-	}
-	if len(raw.Attributes) == 0 {
-		return nil, fmt.Errorf("no saved raw.Attributes")
+	val, ok := raw.Attributes[attrUserPrincipalName]
+	if !ok || len(val) == 0 || val[0] == "" {
+		return nil, errors.ErrLdapNoEmail
 	}
 
-	if raw.Attributes[attrUserPrincipalName][0] == "" {
-		return nil, fmt.Errorf("user has no email")
-	}
-
-	if raw.Attributes[attrSAMAccountName][0] == "" {
-		return nil, fmt.Errorf("user has no name")
+	val, ok = raw.Attributes[attrSAMAccountName]
+	if !ok || len(val) == 0 || val[0] == "" {
+		return nil, errors.ErrLdapNoName
 	}
 
 	username := strings.ToLower(raw.Attributes[attrSAMAccountName][0])
@@ -92,7 +78,7 @@ func (s *AuthService) Authenticate(
 	}
 	groups := cleanGroups
 
-	user := &LDAPUser{
+	user := &model.LDAPUser{
 		Username: username,
 		Email:    email,
 		Groups:   groups,

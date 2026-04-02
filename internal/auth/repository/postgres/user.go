@@ -87,17 +87,32 @@ func (u UserRepo) RefreshUserRoles(ctx context.Context, userID int, groups []str
 func (u UserRepo) GetFullUserByID(ctx context.Context, id int) (model.User, error) {
 	sqlQuery := `
 	SELECT 
-	u.id,
-	u.login,
-	u.email,
-	json.agg(DISTINCT r.name) as roles,
-	json.agg(DISTINCT p.name) as permissions
+    u.id, 
+    u.login, 
+    u.email,
+    u.created_at,
+    u.updated_at,
+    -- Собираем массив объектов Ролей
+    COALESCE(
+        (SELECT json_agg(role_data) FROM (
+            SELECT 
+                r.id, r.code, r.name, r.created_at, r.updated_at,
+                -- Внутри каждой роли собираем массив объектов Прав
+                COALESCE(
+                    (SELECT json_agg(perm_data) FROM (
+                        SELECT p.id, p.code, p.name, p.created_at, p.updated_at
+                        FROM auth.permissions p
+                        JOIN auth.permissions_roles pr ON p.id = pr.permission_id
+                        WHERE pr.role_id = r.id
+                    ) perm_data), '[]'
+                ) as permissions
+            FROM auth.roles r
+            JOIN auth.users_roles ur ON r.id = ur.role_id
+            WHERE ur.user_id = u.id
+        ) role_data), '[]'
+    ) as roles
 	FROM auth.users u
-	JOIN auth.users_roles ur ON u.id = ur.user_id
-	JOIN auth.roles r ON ur.role_id = r.id
-	JOIN auth.permissions_roles pr ON r.id = pr.permission_id
-	JOIN auth.permissions p ON pr.permission_id = p.id
-	ORDER BY u.id ASC LIMIT 100
+	WHERE u.id = $1;
 	`
 	var user model.User
 	err := pgxscan.Get(ctx, u.Conn, &user, sqlQuery, id)

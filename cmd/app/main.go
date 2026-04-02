@@ -6,6 +6,7 @@ import (
 	"ad_integration/internal/auth/service"
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/k0kubun/pp"
 )
@@ -36,16 +37,17 @@ func main() {
 	defer client.Conn.Close()
 
 	s := service.NewAuthService(client, userRepo)
-	fmt.Println(login, password)
 
+	login = os.Getenv("LOGIN")
+	password = os.Getenv("PASSWD")
 	LdapUser, err := s.Authenticate(ctx, login, password)
 	if err != nil {
-		fmt.Println("Fail to Fetch User's Details:", err)
+		fmt.Println("Fail to authenticate:", err)
 		return
 	}
 	pp.Println(LdapUser)
 
-	userID, err := s.UserRepository.SyncUser(ctx, LdapUser)
+	user, err := s.UserRepository.SyncUser(ctx, login, LdapUser.Email)
 	if err != nil {
 		fmt.Println("Ошибка при сихронизации user:", err)
 		return
@@ -56,7 +58,7 @@ func main() {
 		return
 	}
 
-	if err := s.UserRepository.RefreshUserRoles(ctx, userID, LdapUser.Groups); err != nil {
+	if err := s.UserRepository.RefreshUserRoles(ctx, user.ID, LdapUser.Groups); err != nil {
 		fmt.Println("Ошибка при обновление ролей пользователя:", err)
 		return
 	}

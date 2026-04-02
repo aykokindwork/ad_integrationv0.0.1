@@ -6,6 +6,8 @@ import (
 	"ad_integration/internal/auth/repository"
 
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/pgxpool"
 
 	"context"
 )
@@ -14,10 +16,18 @@ type UserRepo struct {
 	*DbConn
 }
 
-func NewUserRepo(conn *DbConn) repository.UserRepository {
+func NewUserRepo(pool *DbConn) repository.UserRepository {
 	return &UserRepo{
-		conn,
+		pool,
 	}
+}
+
+func (u *UserRepo) getExecutor(ctx context.Context) Querier {
+	if tx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
+		return tx
+	}
+
+	return u.Pool
 }
 
 func (u UserRepo) SyncUser(ctx context.Context, login string, email string) (model.User, error) {
@@ -30,7 +40,10 @@ func (u UserRepo) SyncUser(ctx context.Context, login string, email string) (mod
 	RETURNING id, login, email, created_at, updated_at;
 	`
 	var user model.User
-	err := pgxscan.Get(ctx, u.Conn, &user, sqlQuery, login, email)
+
+	executor := u.getExecutor(ctx)
+
+	err := pgxscan.Get(ctx, executor, &user, sqlQuery, login, email)
 	if err != nil {
 		return model.User{}, apperr.ErrSyncUser.WithErr(err)
 	}
@@ -46,22 +59,21 @@ func (u UserRepo) SyncGroups(ctx context.Context, groups []string) error {
 	ON CONFLICT (ad_group_name) WHERE role_id IS NULL DO NOTHING;
 	`
 
-	_, err := u.DbConn.Conn.Exec(ctx, sqlQuery, groups)
+	executor := u.getExecutor(ctx)
+
+	_, err := executor.Exec(ctx, sqlQuery, groups)
 	if err != nil {
 		return err
 	}
 
-	return apperr.ErrSyncGroups.WithErr(err)
+	return nil
 }
 
 func (u UserRepo) RefreshUserRoles(ctx context.Context, userID int, groups []string) error {
-	tx, err := u.Conn.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, "DELETE FROM users_roles WHERE user_id = $1", userID)
+	executor := u.getExecutor(ctx)
+
+	_, err := executor.Exec(ctx, "DELETE FROM users_roles WHERE user_id = $1", userID)
 	if err != nil {
 		return apperr.ErrRefreshUserRoles.WithErr(err)
 	}
@@ -76,15 +88,15 @@ func (u UserRepo) RefreshUserRoles(ctx context.Context, userID int, groups []str
     ON CONFLICT DO NOTHING;
     `
 	// $1 — ID юзера, $2 — слайс []string (Go-массив групп)
-	_, err = tx.Exec(ctx, query, userID, groups)
+	_, err = executor.Exec(ctx, query, userID, groups)
 	if err != nil {
 		return apperr.ErrRefreshUserRoles.WithErr(err)
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
-func (u UserRepo) GetFullUserByID(ctx context.Context, id int) (model.User, error) {
+func (u UserRepo) GetUserByID(ctx context.Context, id int) (model.User, error) {
 	sqlQuery := `
 	SELECT 
     u.id, 
@@ -114,8 +126,11 @@ func (u UserRepo) GetFullUserByID(ctx context.Context, id int) (model.User, erro
 	FROM auth.users u
 	WHERE u.id = $1;
 	`
+
+	executor := u.getExecutor(ctx)
+
 	var user model.User
-	err := pgxscan.Get(ctx, u.Conn, &user, sqlQuery, id)
+	err := pgxscan.Get(ctx, executor, &user, sqlQuery, id)
 	if err != nil {
 		return model.User{}, apperr.ErrGetFullUserByID.WithErr(err)
 	}

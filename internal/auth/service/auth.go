@@ -28,14 +28,16 @@ var adUserAttributes = []string{
 var loginRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,20}$`)
 
 type AuthService struct {
-	Provider       IdentityProvider
-	UserRepository UserRepository
+	provider       IdentityProvider
+	userRepository UserRepository
+	txManager      TxManager
 }
 
-func NewAuthService(provider IdentityProvider, repository UserRepository) *AuthService {
+func NewAuthService(provider IdentityProvider, repository UserRepository, txManager TxManager) *AuthService {
 	return &AuthService{
-		Provider:       provider,
-		UserRepository: repository,
+		provider:       provider,
+		userRepository: repository,
+		txManager:      txManager,
 	}
 }
 
@@ -45,12 +47,12 @@ func (s *AuthService) Authenticate(
 	passwd string,
 ) (*model.LDAPUser, error) {
 
-	if err := s.Provider.BindUser(login, passwd); err != nil {
+	if err := s.provider.BindUser(login, passwd); err != nil {
 		return nil, apperr.ErrLdapBind.WithErr(err)
 	}
 
 	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login)) //go change ldap, in layer http this can be checked
-	raw, err := s.Provider.Search(ctx, filter, adUserAttributes)
+	raw, err := s.provider.Search(ctx, filter, adUserAttributes)
 	if err != nil {
 		return nil, apperr.ErrLdapSearch.WithErr(err)
 	}
@@ -78,18 +80,53 @@ func (s *AuthService) Authenticate(
 	}
 	groups := cleanGroups
 
-	user := &model.LDAPUser{
+	userLdap := &model.LDAPUser{
 		Username: username,
 		Email:    email,
 		Groups:   groups,
 	}
 
-	return user, nil
+	return userLdap, nil
 }
 
 func (s *AuthService) Authorization(
 	ctx context.Context,
-	userLdap model.LDAPUser,
-) (model.User, error) {
-	
+	login string,
+	userLdap *model.LDAPUser,
+) (int, error) {
+	var userID int
+
+	err := s.txManager.WithInTransaction(ctx, func(txCtx context.Context) error {
+		user, err := s.userRepository.SyncUser(txCtx, login, userLdap.Email)
+		if err != nil {
+			return err
+		}
+
+		if err := s.userRepository.SyncGroups(txCtx, userLdap.Groups); err != nil {
+			return err
+		}
+
+		if err := s.userRepository.RefreshUserRoles(txCtx, user.ID, userLdap.Groups); err != nil {
+			return err
+		}
+		userID = user.ID
+
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return userID, nil
+
+}
+
+func (s *AuthService) GetUserByID(ctx context.Context, userID int) (model.User, error) {
+
+	user, err := s.userRepository.GetUserByID(ctx, userID)
+	if err != nil {
+		return model.User{}, err
+	}
+
+	return user, nil
 }

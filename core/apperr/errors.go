@@ -50,5 +50,5 @@ var (
 	ErrSyncUser         = &AppError{Message: "failed to sync user"}
 	ErrSyncGroups       = &AppError{Message: "failed to sync groups"}
 	ErrRefreshUserRoles = &AppError{Message: "failed to refresh user roles"}
-	ErrGetFullUserByID  = &AppError{Message: "failed to get full user by id"}
+	ErrGetFullUserByID  = &AppError{Message: "failed to get user by id"}
 )

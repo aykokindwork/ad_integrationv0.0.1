@@ -35,19 +35,19 @@ func (m *MockUserRepository) EXPECT() *MockUserRepositoryMockRecorder {
 	return m.recorder
 }
 
-// GetFullUserByID mocks base method.
-func (m *MockUserRepository) GetFullUserByID(ctx context.Context, id int) (model.User, error) {
+// GetUserByID mocks base method.
+func (m *MockUserRepository) GetUserByID(ctx context.Context, userID int) (model.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFullUserByID", ctx, id)
+	ret := m.ctrl.Call(m, "GetUserByID", ctx, userID)
 	ret0, _ := ret[0].(model.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetFullUserByID indicates an expected call of GetFullUserByID.
-func (mr *MockUserRepositoryMockRecorder) GetFullUserByID(ctx, id interface{}) *gomock.Call {
+// GetUserByID indicates an expected call of GetUserByID.
+func (mr *MockUserRepositoryMockRecorder) GetUserByID(ctx, userID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullUserByID", reflect.TypeOf((*MockUserRepository)(nil).GetFullUserByID), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByID", reflect.TypeOf((*MockUserRepository)(nil).GetUserByID), ctx, userID)
 }
 
 // RefreshUserRoles mocks base method.
@@ -91,4 +91,41 @@ func (m *MockUserRepository) SyncUser(ctx context.Context, login, email string) 
 func (mr *MockUserRepositoryMockRecorder) SyncUser(ctx, login, email interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncUser", reflect.TypeOf((*MockUserRepository)(nil).SyncUser), ctx, login, email)
+}
+
+// MockTransactionManager is a mock of TransactionManager interface.
+type MockTransactionManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockTransactionManagerMockRecorder
+}
+
+// MockTransactionManagerMockRecorder is the mock recorder for MockTransactionManager.
+type MockTransactionManagerMockRecorder struct {
+	mock *MockTransactionManager
+}
+
+// NewMockTransactionManager creates a new mock instance.
+func NewMockTransactionManager(ctrl *gomock.Controller) *MockTransactionManager {
+	mock := &MockTransactionManager{ctrl: ctrl}
+	mock.recorder = &MockTransactionManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockTransactionManager) EXPECT() *MockTransactionManagerMockRecorder {
+	return m.recorder
+}
+
+// WithInTransaction mocks base method.
+func (m *MockTransactionManager) WithInTransaction(ctx context.Context, fn func(context.Context) error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithInTransaction", ctx, fn)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WithInTransaction indicates an expected call of WithInTransaction.
+func (mr *MockTransactionManagerMockRecorder) WithInTransaction(ctx, fn interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithInTransaction", reflect.TypeOf((*MockTransactionManager)(nil).WithInTransaction), ctx, fn)
 }

@@ -104,12 +104,12 @@ func (c *Client) Search(ctx context.Context, filter string, attributes []string)
 		return nil, apperr.ErrLdapNoDN
 	}
 
-	if len(rawUser.Attributes) == 0 {
-		return nil, apperr.ErrLdapNoAttributes
-	}
-
 	for _, attr := range attributes {
 		rawUser.Attributes[attr] = entry.GetAttributeValues(attr)
+	}
+
+	if len(rawUser.Attributes) == 0 {
+		return nil, apperr.ErrLdapNoAttributes
 	}
 
 	return rawUser, nil

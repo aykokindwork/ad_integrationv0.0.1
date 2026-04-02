@@ -21,11 +21,12 @@ func main() {
 	}
 
 	ctx := context.Background()
+
 	Db, err := postgres.NewConnection(ctx, cfg.DB)
 	if err != nil {
 		panic(err)
 	}
-	defer Db.Conn.Close(ctx)
+	defer Db.Pool.Close()
 
 	userRepo := postgres.NewUserRepo(Db)
 
@@ -36,30 +37,31 @@ func main() {
 	}
 	defer client.Conn.Close()
 
-	s := service.NewAuthService(client, userRepo)
+	txManager := postgres.NewTranscationManager(Db.Pool)
+	s := service.NewAuthService(client, userRepo, txManager)
 
 	login = os.Getenv("LOGIN")
 	password = os.Getenv("PASSWD")
-	LdapUser, err := s.Authenticate(ctx, login, password)
+
+	userLdap, err := s.Authenticate(ctx, login, password)
 	if err != nil {
 		fmt.Println("Fail to authenticate:", err)
 		return
 	}
-	pp.Println(LdapUser)
+	pp.Println(userLdap)
 
-	user, err := s.UserRepository.SyncUser(ctx, login, LdapUser.Email)
+	userID, err := s.Authorization(ctx, login, userLdap)
 	if err != nil {
-		fmt.Println("Ошибка при сихронизации user:", err)
+		fmt.Println(err)
 		return
 	}
 
-	if err := s.UserRepository.SyncGroups(ctx, LdapUser.Groups); err != nil {
-		fmt.Println("Ошибка при синхронизации групп:", err)
+	user, err := s.GetUserByID(ctx, userID)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	if err := s.UserRepository.RefreshUserRoles(ctx, user.ID, LdapUser.Groups); err != nil {
-		fmt.Println("Ошибка при обновление ролей пользователя:", err)
-		return
-	}
+	pp.Println(user)
+
 }

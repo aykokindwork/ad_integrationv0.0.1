@@ -1,9 +1,9 @@
 package postgres
 
 import (
+	"ad_integration/core/apperr"
 	"ad_integration/internal/auth/model"
 	"ad_integration/internal/auth/repository"
-	"fmt"
 
 	"github.com/georgysavva/scany/v2/pgxscan"
 
@@ -32,7 +32,7 @@ func (u UserRepo) SyncUser(ctx context.Context, login string, email string) (mod
 	var user model.User
 	err := pgxscan.Get(ctx, u.Conn, &user, sqlQuery, login, email)
 	if err != nil {
-		return model.User{}, fmt.Errorf("fail to sync user: %w", err)
+		return model.User{}, apperr.ErrSyncUser.WithErr(err)
 	}
 
 	return user, nil
@@ -51,7 +51,7 @@ func (u UserRepo) SyncGroups(ctx context.Context, groups []string) error {
 		return err
 	}
 
-	return nil
+	return apperr.ErrSyncGroups.WithErr(err)
 }
 
 func (u UserRepo) RefreshUserRoles(ctx context.Context, userID int, groups []string) error {
@@ -63,7 +63,7 @@ func (u UserRepo) RefreshUserRoles(ctx context.Context, userID int, groups []str
 
 	_, err = tx.Exec(ctx, "DELETE FROM users_roles WHERE user_id = $1", userID)
 	if err != nil {
-		return err
+		return apperr.ErrRefreshUserRoles.WithErr(err)
 	}
 
 	// Если группа из AD не привязана ни к какой роли, она просто проигнорируется.
@@ -78,7 +78,7 @@ func (u UserRepo) RefreshUserRoles(ctx context.Context, userID int, groups []str
 	// $1 — ID юзера, $2 — слайс []string (Go-массив групп)
 	_, err = tx.Exec(ctx, query, userID, groups)
 	if err != nil {
-		return err
+		return apperr.ErrRefreshUserRoles.WithErr(err)
 	}
 
 	return tx.Commit(ctx)
@@ -117,7 +117,7 @@ func (u UserRepo) GetFullUserByID(ctx context.Context, id int) (model.User, erro
 	var user model.User
 	err := pgxscan.Get(ctx, u.Conn, &user, sqlQuery, id)
 	if err != nil {
-		return model.User{}, fmt.Errorf("fail to scan: %w", err)
+		return model.User{}, apperr.ErrGetFullUserByID.WithErr(err)
 	}
 
 	return user, nil

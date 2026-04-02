@@ -1,7 +1,7 @@
 package service
 
 import (
-	errors2 "ad_integration/core/errors"
+	errors2 "ad_integration/core/apperr"
 	"ad_integration/internal/auth/model"
 	"ad_integration/internal/auth/repository/repositorymocks"
 	servicemocks "ad_integration/internal/auth/service/serviceMocks"

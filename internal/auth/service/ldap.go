@@ -2,7 +2,7 @@ package service
 
 import (
 	"ad_integration/config"
-	errors2 "ad_integration/core/errors"
+	"ad_integration/core/apperr"
 	"ad_integration/internal/auth/model"
 	"context"
 	"crypto/tls"
@@ -26,7 +26,7 @@ type Client struct {
 func NewLDAPConnection(cfg config.LDAPConfig) (*Client, error) {
 	conn, err := ldap.DialURL(cfg.URL)
 	if err != nil {
-		return nil, errors2.ErrLdapUnexpected.WithErr(err)
+		return nil, apperr.ErrLdapUnexpected.WithErr(err)
 	}
 
 	// TLS шифрование
@@ -36,7 +36,7 @@ func NewLDAPConnection(cfg config.LDAPConfig) (*Client, error) {
 			ServerName:         cfg.ServerName,
 		})
 		if err != nil {
-			return nil, errors2.ErrLdapTLS.WithErr(err)
+			return nil, apperr.ErrLdapTLS.WithErr(err)
 		}
 	}
 
@@ -60,13 +60,13 @@ func (c *Client) BindUser(login string, password string) error {
 
 			switch {
 			case strings.Contains(errText, substrADInvalidCreds):
-				return errors2.ErrInvalidCredentials
+				return apperr.ErrInvalidCredentials
 
 			case strings.Contains(errText, substrADUserBlocked):
-				return errors2.ErrUserIsBlocked
+				return apperr.ErrUserIsBlocked
 
 			default:
-				return errors2.ErrLdapUnexpected
+				return apperr.ErrLdapUnexpected
 			}
 		}
 	}
@@ -91,7 +91,7 @@ func (c *Client) Search(ctx context.Context, filter string, attributes []string)
 	}
 
 	if len(searchResult.Entries) == 0 {
-		return nil, errors2.ErrAdUserNotFound
+		return nil, apperr.ErrAdUserNotFound
 	}
 
 	entry := searchResult.Entries[0]
@@ -101,11 +101,11 @@ func (c *Client) Search(ctx context.Context, filter string, attributes []string)
 	}
 
 	if len(rawUser.DN) == 0 {
-		return nil, errors2.ErrLdapNoDN
+		return nil, apperr.ErrLdapNoDN
 	}
 
 	if len(rawUser.Attributes) == 0 {
-		return nil, errors2.ErrLdapNoAttributes
+		return nil, apperr.ErrLdapNoAttributes
 	}
 
 	for _, attr := range attributes {

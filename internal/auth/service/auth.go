@@ -1,7 +1,7 @@
 package service
 
 import (
-	"ad_integration/core/errors"
+	"ad_integration/core/apperr"
 	"ad_integration/internal/auth/model"
 	"context"
 	"fmt"
@@ -46,23 +46,23 @@ func (s *AuthService) Authenticate(
 ) (*model.LDAPUser, error) {
 
 	if err := s.Provider.BindUser(login, passwd); err != nil {
-		return nil, errors.ErrLdapBind.WithErr(err)
+		return nil, apperr.ErrLdapBind.WithErr(err)
 	}
 
 	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login)) //go change ldap, in layer http this can be checked
 	raw, err := s.Provider.Search(ctx, filter, adUserAttributes)
 	if err != nil {
-		return nil, errors.ErrLdapSearch.WithErr(err)
+		return nil, apperr.ErrLdapSearch.WithErr(err)
 	}
 
 	val, ok := raw.Attributes[attrUserPrincipalName]
 	if !ok || len(val) == 0 || val[0] == "" {
-		return nil, errors.ErrLdapNoEmail
+		return nil, apperr.ErrLdapNoEmail
 	}
 
 	val, ok = raw.Attributes[attrSAMAccountName]
 	if !ok || len(val) == 0 || val[0] == "" {
-		return nil, errors.ErrLdapNoName
+		return nil, apperr.ErrLdapNoName
 	}
 
 	username := strings.ToLower(raw.Attributes[attrSAMAccountName][0])
@@ -85,4 +85,11 @@ func (s *AuthService) Authenticate(
 	}
 
 	return user, nil
+}
+
+func (s *AuthService) Authorization(
+	ctx context.Context,
+	userLdap model.LDAPUser,
+) (model.User, error) {
+	
 }

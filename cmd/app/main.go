@@ -2,13 +2,11 @@ package main
 
 import (
 	"ad_integration/config"
+	"ad_integration/internal/auth/delivery/http"
 	"ad_integration/internal/auth/repository/postgres"
 	"ad_integration/internal/auth/service"
 	"context"
 	"fmt"
-	"os"
-
-	"github.com/k0kubun/pp"
 )
 
 var login string
@@ -40,28 +38,35 @@ func main() {
 	txManager := postgres.NewTranscationManager(Db.Pool)
 	s := service.NewAuthService(client, userRepo, txManager)
 
-	login = os.Getenv("LOGIN")
-	password = os.Getenv("PASSWD")
+	/*
+		login = os.Getenv("LOGIN")
+		password = os.Getenv("PASSWD")
 
-	userLdap, err := s.Authenticate(ctx, login, password)
-	if err != nil {
-		fmt.Println("Fail to authenticate:", err)
-		return
+		userLdap, err := s.Authenticate(ctx, login, password)
+		if err != nil {
+			fmt.Println("Fail to authenticate:", err)
+			return
+		}
+		pp.Println(userLdap)
+
+		userID, err := s.Authorization(ctx, login, userLdap)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		user, err := s.GetUserByID(ctx, userID)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		pp.Println(user)*/
+	handler := http.NewHandler(s)
+
+	srv := handler.Init()
+
+	if err := srv.Run(":8080"); err != nil {
+		panic(err)
 	}
-	pp.Println(userLdap)
-
-	userID, err := s.Authorization(ctx, login, userLdap)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	user, err := s.GetUserByID(ctx, userID)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	pp.Println(user)
-
 }

@@ -6,7 +6,7 @@ import (
 )
 
 //go:generate mockgen -package=repositorymocks -destination=./repositorymocks/mocks.go -source=repository.go *
-type UserRepository interface {
+type Userer interface {
 	SyncUser(ctx context.Context, login, email string) (model.User, error)
 	SyncGroups(ctx context.Context, groups []string) error
 	RefreshUserRoles(ctx context.Context, userID int, groups []string) error

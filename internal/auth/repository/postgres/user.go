@@ -16,7 +16,7 @@ type UserRepo struct {
 	*DbConn
 }
 
-func NewUserRepo(pool *DbConn) repository.UserRepository {
+func NewUserRepo(pool *DbConn) repository.Userer {
 	return &UserRepo{
 		pool,
 	}

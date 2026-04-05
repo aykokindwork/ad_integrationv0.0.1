@@ -28,16 +28,16 @@ var adUserAttributes = []string{
 var loginRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,20}$`)
 
 type AuthService struct {
-	provider       IdentityProvider
-	userRepository UserRepository
-	txManager      TxManager
+	ldap      Ldaper
+	userDB    Userer
+	txManager TxManager
 }
 
-func NewAuthService(provider IdentityProvider, repository UserRepository, txManager TxManager) *AuthService {
+func NewAuthService(provider Ldaper, repository Userer, txManager TxManager) *AuthService {
 	return &AuthService{
-		provider:       provider,
-		userRepository: repository,
-		txManager:      txManager,
+		ldap:      provider,
+		userDB:    repository,
+		txManager: txManager,
 	}
 }
 
@@ -47,12 +47,12 @@ func (s *AuthService) Authenticate(
 	passwd string,
 ) (*model.LDAPUser, error) {
 
-	if err := s.provider.BindUser(login, passwd); err != nil {
+	if err := s.ldap.BindUser(login, passwd); err != nil {
 		return nil, apperr.ErrLdapBind.WithErr(err)
 	}
 
 	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login)) //go change ldap, in layer http this can be checked
-	raw, err := s.provider.Search(ctx, filter, adUserAttributes)
+	raw, err := s.ldap.Search(ctx, filter, adUserAttributes)
 	if err != nil {
 		return nil, apperr.ErrLdapSearch.WithErr(err)
 	}
@@ -97,16 +97,16 @@ func (s *AuthService) Authorization(
 	var userID int
 
 	err := s.txManager.WithInTransaction(ctx, func(txCtx context.Context) error {
-		user, err := s.userRepository.SyncUser(txCtx, login, userLdap.Email)
+		user, err := s.userDB.SyncUser(txCtx, login, userLdap.Email)
 		if err != nil {
 			return err
 		}
 
-		if err := s.userRepository.SyncGroups(txCtx, userLdap.Groups); err != nil {
+		if err := s.userDB.SyncGroups(txCtx, userLdap.Groups); err != nil {
 			return err
 		}
 
-		if err := s.userRepository.RefreshUserRoles(txCtx, user.ID, userLdap.Groups); err != nil {
+		if err := s.userDB.RefreshUserRoles(txCtx, user.ID, userLdap.Groups); err != nil {
 			return err
 		}
 		userID = user.ID
@@ -123,7 +123,7 @@ func (s *AuthService) Authorization(
 
 func (s *AuthService) GetUserByID(ctx context.Context, userID int) (model.User, error) {
 
-	user, err := s.userRepository.GetUserByID(ctx, userID)
+	user, err := s.userDB.GetUserByID(ctx, userID)
 	if err != nil {
 		return model.User{}, err
 	}

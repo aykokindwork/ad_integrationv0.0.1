@@ -3,7 +3,9 @@ package service
 import (
 	"ad_integration/core/apperr"
 	"ad_integration/internal/auth/model"
+	"ad_integration/internal/infrasctructure/kafka"
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -31,13 +33,20 @@ type AuthService struct {
 	ldap      Ldaper
 	userDB    Userer
 	txManager TxManager
+	kProducer *kafka.Producer
 }
 
-func NewAuthService(provider Ldaper, repository Userer, txManager TxManager) *AuthService {
+func NewAuthService(
+	provider Ldaper,
+	repository Userer,
+	txManager TxManager,
+	kProducer *kafka.Producer,
+) *AuthService {
 	return &AuthService{
 		ldap:      provider,
 		userDB:    repository,
 		txManager: txManager,
+		kProducer: kProducer,
 	}
 }
 
@@ -51,7 +60,7 @@ func (s *AuthService) Authenticate(
 		return nil, apperr.ErrLdapBind.WithErr(err)
 	}
 
-	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login)) //go change ldap, in layer http this can be checked
+	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login))
 	raw, err := s.ldap.Search(ctx, filter, adUserAttributes)
 	if err != nil {
 		return nil, apperr.ErrLdapSearch.WithErr(err)
@@ -85,6 +94,14 @@ func (s *AuthService) Authenticate(
 		Email:    email,
 		Groups:   groups,
 	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"username": userLdap.Email,
+		"event":    "LDAP_AUTH_SUCCESS",
+		"status":   "AWAITING_OTP",
+	})
+
+	_ = s.kProducer.SendMessage(ctx, "auth-log", []byte(userLdap.Email), payload)
 
 	return userLdap, nil
 }

@@ -5,6 +5,7 @@ import (
 	"ad_integration/internal/auth/delivery/http"
 	"ad_integration/internal/auth/repository/postgres"
 	"ad_integration/internal/auth/service"
+	"ad_integration/internal/infrasctructure/kafka"
 	"context"
 	"fmt"
 	"os"
@@ -43,8 +44,12 @@ func main() {
 		client = realClient
 	}
 
+	kProducer := kafka.NewProducer([]string{"kafka:9092"})
+	defer kProducer.Close()
+
 	txManager := postgres.NewTranscationManager(Db.Pool)
-	s := service.NewAuthService(client, userRepo, txManager)
+
+	s := service.NewAuthService(client, userRepo, txManager, kProducer)
 
 	/*
 		login = os.Getenv("LOGIN")

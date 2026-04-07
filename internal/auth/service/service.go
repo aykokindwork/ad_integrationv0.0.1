@@ -18,6 +18,11 @@ type Ldaper interface {
 	BindUser(login string, password string) error
 }
 
+type MockLdaper interface {
+	Search(ctx context.Context, filter string, attributes []string) (*model.RawUser, error)
+	BindUser(login string, password string) error
+}
+
 type Userer interface {
 	SyncUser(ctx context.Context, login, email string) (model.User, error)
 	SyncGroups(ctx context.Context, groups []string) error

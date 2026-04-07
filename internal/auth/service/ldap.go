@@ -22,6 +22,9 @@ type Client struct {
 	config config.LDAPConfig
 }
 
+type MockClient struct {
+}
+
 // connect with TLS LDAP
 func NewLDAPConnection(cfg config.LDAPConfig) (*Client, error) {
 	conn, err := ldap.DialURL(cfg.URL)
@@ -140,3 +143,11 @@ func getBaseDN(l *ldap.Conn) (string, error) {
 	return res.Entries[0].GetAttributeValue("defaultNamingContext"), nil
 }
 */
+
+func (m MockClient) Search(ctx context.Context, filter string, attributes []string) (*model.RawUser, error) {
+	return &model.RawUser{}, nil
+}
+
+func (m MockClient) BindUser(login string, password string) error {
+	return nil
+}

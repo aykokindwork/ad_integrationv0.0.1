@@ -7,6 +7,7 @@ import (
 	"ad_integration/internal/auth/service"
 	"context"
 	"fmt"
+	"os"
 )
 
 var login string
@@ -28,12 +29,19 @@ func main() {
 
 	userRepo := postgres.NewUserRepo(Db)
 
-	client, err := service.NewLDAPConnection(cfg.LDAP)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
+	var client service.Ldaper
+	if os.Getenv("APP_ENV") == "local" {
+		client = &service.MockClient{}
+	} else {
+		realClient, err := service.NewLDAPConnection(cfg.LDAP)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		defer realClient.Conn.Close()
+
+		client = realClient
 	}
-	defer client.Conn.Close()
 
 	txManager := postgres.NewTranscationManager(Db.Pool)
 	s := service.NewAuthService(client, userRepo, txManager)

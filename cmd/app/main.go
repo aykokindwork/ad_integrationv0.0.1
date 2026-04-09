@@ -5,12 +5,12 @@ import (
 	"ad_integration/internal/auth/delivery/http"
 	"ad_integration/internal/auth/repository/postgres"
 	"ad_integration/internal/auth/service"
+	"ad_integration/internal/infrasctructure/kafka"
+	kafkaauth "ad_integration/internal/infrasctructure/kafka/auth"
 	"context"
 	"fmt"
+	"os"
 )
-
-var login string
-var password string
 
 func main() {
 	cfg, err := config.Load()
@@ -28,15 +28,28 @@ func main() {
 
 	userRepo := postgres.NewUserRepo(Db)
 
-	client, err := service.NewLDAPConnection(cfg.LDAP)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
+	var client service.Ldaper
+	if os.Getenv("APP_ENV") == "local" {
+		client = &service.MockClient{}
+	} else {
+		realClient, err := service.NewLDAPConnection(cfg.LDAP)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		defer realClient.Conn.Close()
+
+		client = realClient
 	}
-	defer client.Conn.Close()
+
+	baseProducer := kafka.NewProducer([]string{"kafka:9092"})
+	defer baseProducer.Close()
+
+	kProducer := kafkaauth.NewAuthProducer(baseProducer)
 
 	txManager := postgres.NewTranscationManager(Db.Pool)
-	s := service.NewAuthService(client, userRepo, txManager)
+
+	s := service.NewAuthService(client, userRepo, txManager, kProducer)
 
 	/*
 		login = os.Getenv("LOGIN")

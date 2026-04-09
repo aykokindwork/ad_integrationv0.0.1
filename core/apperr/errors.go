@@ -41,6 +41,7 @@ var (
 	ErrAdUserNotFound   = &AppError{Message: "user is not found"}
 	ErrLdapNoEmail      = &AppError{Message: "not saved email"}
 	ErrLdapNoName       = &AppError{Message: "not saved name"}
+	ErrLdapMap          = &AppError{Message: "fail to map"}
 
 	ErrLdapBind = &AppError{Message: "failed to bind user"}
 

@@ -30,6 +30,16 @@ type Userer interface {
 	GetUserByID(ctx context.Context, userID int) (model.User, error)
 }
 
+type EventProducer interface {
+	SendMessage(ctx context.Context, topic string, key, value []byte) error
+}
+
+type AuthEventPublisher interface {
+	PublishLDAPSuccess(ctx context.Context, email string) error
+	PublishOTPSuccess(ctx context.Context, email string) error
+	PublishAuthFailed(ctx context.Context, email string, reason string) error
+}
+
 type TxManager interface {
 	WithInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }

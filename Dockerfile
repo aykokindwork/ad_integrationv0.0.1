@@ -18,6 +18,6 @@ WORKDIR /root/
 COPY --from=builder /app/auth-app .
 
 
-#COPY --from=builder /app/.env .
+COPY --from=builder /app/.env .
 
 CMD ["./auth-app"]

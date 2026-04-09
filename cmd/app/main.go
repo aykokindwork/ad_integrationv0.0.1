@@ -6,13 +6,11 @@ import (
 	"ad_integration/internal/auth/repository/postgres"
 	"ad_integration/internal/auth/service"
 	"ad_integration/internal/infrasctructure/kafka"
+	kafkaauth "ad_integration/internal/infrasctructure/kafka/auth"
 	"context"
 	"fmt"
 	"os"
 )
-
-var login string
-var password string
 
 func main() {
 	cfg, err := config.Load()
@@ -44,8 +42,10 @@ func main() {
 		client = realClient
 	}
 
-	kProducer := kafka.NewProducer([]string{"kafka:9092"})
-	defer kProducer.Close()
+	baseProducer := kafka.NewProducer([]string{"kafka:9092"})
+	defer baseProducer.Close()
+
+	kProducer := kafkaauth.NewAuthProducer(baseProducer)
 
 	txManager := postgres.NewTranscationManager(Db.Pool)
 

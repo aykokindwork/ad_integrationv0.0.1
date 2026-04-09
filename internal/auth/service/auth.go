@@ -3,12 +3,9 @@ package service
 import (
 	"ad_integration/core/apperr"
 	"ad_integration/internal/auth/model"
-	"ad_integration/internal/infrasctructure/kafka"
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/go-ldap/ldap/v3"
 )
@@ -33,20 +30,20 @@ type AuthService struct {
 	ldap      Ldaper
 	userDB    Userer
 	txManager TxManager
-	kProducer *kafka.Producer
+	events    AuthEventPublisher
 }
 
 func NewAuthService(
 	provider Ldaper,
 	repository Userer,
 	txManager TxManager,
-	kProducer *kafka.Producer,
+	events AuthEventPublisher,
 ) *AuthService {
 	return &AuthService{
 		ldap:      provider,
 		userDB:    repository,
 		txManager: txManager,
-		kProducer: kProducer,
+		events:    events,
 	}
 }
 
@@ -66,42 +63,14 @@ func (s *AuthService) Authenticate(
 		return nil, apperr.ErrLdapSearch.WithErr(err)
 	}
 
-	val, ok := raw.Attributes[attrUserPrincipalName]
-	if !ok || len(val) == 0 || val[0] == "" {
-		return nil, apperr.ErrLdapNoEmail
+	userLdap, err := mapLDAPUser(raw.Attributes)
+	if err != nil {
+		return nil, apperr.ErrLdapMap.WithErr(err)
 	}
 
-	val, ok = raw.Attributes[attrSAMAccountName]
-	if !ok || len(val) == 0 || val[0] == "" {
-		return nil, apperr.ErrLdapNoName
+	if err := s.events.PublishLDAPSuccess(ctx, userLdap.Email); err != nil {
+		_ = err
 	}
-
-	username := strings.ToLower(raw.Attributes[attrSAMAccountName][0])
-	email := strings.TrimSpace(strings.ToLower(raw.Attributes[attrUserPrincipalName][0]))
-
-	var cleanGroups []string
-	for _, dn := range raw.Attributes[attrMemberOf] {
-		parts := strings.Split(dn, ",")
-		if len(parts) > 0 {
-			name := strings.TrimPrefix(parts[0], "CN=")
-			cleanGroups = append(cleanGroups, name)
-		}
-	}
-	groups := cleanGroups
-
-	userLdap := &model.LDAPUser{
-		Username: username,
-		Email:    email,
-		Groups:   groups,
-	}
-
-	payload, _ := json.Marshal(map[string]string{
-		"username": userLdap.Email,
-		"event":    "LDAP_AUTH_SUCCESS",
-		"status":   "AWAITING_OTP",
-	})
-
-	_ = s.kProducer.SendMessage(ctx, "auth-log", []byte(userLdap.Email), payload)
 
 	return userLdap, nil
 }

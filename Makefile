@@ -38,9 +38,10 @@ up:
 down:
 	docker-compose down
 
-redeploy:
+stop:
 	docker-compose stop $(APP_NAME)
-	build up
+
+redeploy: stop deploy
 
 logs:
 	docker-compose logs -f $(APP_NAME)

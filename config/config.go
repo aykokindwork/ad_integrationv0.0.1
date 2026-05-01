@@ -28,9 +28,10 @@ var defaultUse = map[string]string{
 	"PROTOCOL":   "LDAP",
 	"PORT":       "389",
 	"BASEDN":     "DC=tp,DC=local",
-	"USETLS":     "true",
+	"USETLS":     "false",
 	"SERVERNAME": "DC01.tp.local",
 	"ATTRIBUTES": "userPrincipalName,memberOf,sAMAccountName",
+	"ADDRESS":    "",
 }
 
 func Load() (*Config, error) {

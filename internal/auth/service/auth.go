@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/go-ldap/ldap/v3"
 )
@@ -31,13 +30,20 @@ type AuthService struct {
 	ldap      Ldaper
 	userDB    Userer
 	txManager TxManager
+	events    AuthEventPublisher
 }
 
-func NewAuthService(provider Ldaper, repository Userer, txManager TxManager) *AuthService {
+func NewAuthService(
+	provider Ldaper,
+	repository Userer,
+	txManager TxManager,
+	events AuthEventPublisher,
+) *AuthService {
 	return &AuthService{
 		ldap:      provider,
 		userDB:    repository,
 		txManager: txManager,
+		events:    events,
 	}
 }
 
@@ -51,39 +57,19 @@ func (s *AuthService) Authenticate(
 		return nil, apperr.ErrLdapBind.WithErr(err)
 	}
 
-	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login)) //go change ldap, in layer http this can be checked
+	filter := fmt.Sprintf(userSearchFilterTmpl, ldap.EscapeFilter(login))
 	raw, err := s.ldap.Search(ctx, filter, adUserAttributes)
 	if err != nil {
 		return nil, apperr.ErrLdapSearch.WithErr(err)
 	}
 
-	val, ok := raw.Attributes[attrUserPrincipalName]
-	if !ok || len(val) == 0 || val[0] == "" {
-		return nil, apperr.ErrLdapNoEmail
+	userLdap, err := mapLDAPUser(raw.Attributes)
+	if err != nil {
+		return nil, apperr.ErrLdapMap.WithErr(err)
 	}
 
-	val, ok = raw.Attributes[attrSAMAccountName]
-	if !ok || len(val) == 0 || val[0] == "" {
-		return nil, apperr.ErrLdapNoName
-	}
-
-	username := strings.ToLower(raw.Attributes[attrSAMAccountName][0])
-	email := strings.TrimSpace(strings.ToLower(raw.Attributes[attrUserPrincipalName][0]))
-
-	var cleanGroups []string
-	for _, dn := range raw.Attributes[attrMemberOf] {
-		parts := strings.Split(dn, ",")
-		if len(parts) > 0 {
-			name := strings.TrimPrefix(parts[0], "CN=")
-			cleanGroups = append(cleanGroups, name)
-		}
-	}
-	groups := cleanGroups
-
-	userLdap := &model.LDAPUser{
-		Username: username,
-		Email:    email,
-		Groups:   groups,
+	if err := s.events.PublishLDAPSuccess(ctx, userLdap.Email); err != nil {
+		_ = err
 	}
 
 	return userLdap, nil

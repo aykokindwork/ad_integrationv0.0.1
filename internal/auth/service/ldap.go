@@ -22,14 +22,15 @@ type Client struct {
 	config config.LDAPConfig
 }
 
-// connect with TLS LDAP
+type MockClient struct {
+}
+
 func NewLDAPConnection(cfg config.LDAPConfig) (*Client, error) {
 	conn, err := ldap.DialURL(cfg.URL)
 	if err != nil {
 		return nil, apperr.ErrLdapUnexpected.WithErr(err)
 	}
 
-	// TLS шифрование
 	if cfg.UseTLS {
 		err = conn.StartTLS(&tls.Config{
 			InsecureSkipVerify: false,
@@ -140,3 +141,21 @@ func getBaseDN(l *ldap.Conn) (string, error) {
 	return res.Entries[0].GetAttributeValue("defaultNamingContext"), nil
 }
 */
+
+func (m MockClient) Search(ctx context.Context, filter string, attributes []string) (*model.RawUser, error) {
+	return &model.RawUser{
+		DN: "some",
+		Attributes: map[string][]string{
+			attrUserPrincipalName: {
+				"some@gmail.com",
+			},
+			attrSAMAccountName: {
+				"some",
+			},
+		},
+	}, nil
+}
+
+func (m MockClient) BindUser(login string, password string) error {
+	return nil
+}

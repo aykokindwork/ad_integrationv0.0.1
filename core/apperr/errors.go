@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+// TODO: сделать стэк ошибок (типа ПОДРОБНО про ошибку)
+
 type AppError struct {
 	Message string
 	Err     error

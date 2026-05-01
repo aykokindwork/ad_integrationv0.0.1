@@ -31,6 +31,7 @@ var defaultUse = map[string]string{
 	"USETLS":     "false",
 	"SERVERNAME": "DC01.tp.local",
 	"ATTRIBUTES": "userPrincipalName,memberOf,sAMAccountName",
+	"ADDRESS":    "",
 }
 
 func Load() (*Config, error) {

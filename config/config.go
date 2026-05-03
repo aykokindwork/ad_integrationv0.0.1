@@ -31,7 +31,7 @@ var defaultUse = map[string]string{
 	"USETLS":     "false",
 	"SERVERNAME": "DC01.tp.local",
 	"ATTRIBUTES": "userPrincipalName,memberOf,sAMAccountName",
-	"ADDRESS":    "",
+	"DB_ADDRESS": "postgres://postgres:123@localhost:5432/ad_integration?sslmode=disable",
 }
 
 func Load() (*Config, error) {

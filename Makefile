@@ -11,16 +11,16 @@ script-run:
 	go run cmd\seed\main.go
 
 migrate-up:
-	migrate -path migrations -database "${ADDRESS}" up
+	migrate -path migrations -database "${DB_ADDRESS}" up
 
 migrate-down:
-	migrate -path migrations -database "${ADDRESS}" down
+	migrate -path migrations -database "${DB_ADDRESS}" down
 
 migrate-version:
-	migrate -path migrations -database "${ADDRESS}" version
+	migrate -path migrations -database "${DB_ADDRESS}" version
 
 migrate-fix:
-	migrate -path migrations -database "${ADDRESS}" force $(v)
+	migrate -path migrations -database "${DB_ADDRESS}" force $(v)
 
 migrate-create:
 	migrate create -ext sql -dir migrations -seq $(name)
